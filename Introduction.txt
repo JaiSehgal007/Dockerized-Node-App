@@ -1,0 +1,247 @@
+Problem statement:
+As a developer I am having a local machine, it have some hardware and sw config. ( Win 11, Intel , Node, Redis etc.)
+and there is a nodejs server which is running fine
+The problem occur when there is a team  when a new developer comes, it must install the same version to run the code when copied from github
+
+1st problem : an extra effor to set up the whole env
+2nd : version vary ( cause error) this leads to change in environment
+3rd : even if versions changes, the OS incompatibility starts to trouble
+4th : If deployed on cloud, there also we need to set up the same configuration, and if we are in auto 
+      scaling then we need to this repetitive task in all the machines
+
+
+so in crux  we can say docker solves the problem to replicate environment
+
+
+So in docker we make containers, in these containers we do our configurations, what would be its OS, what would be its tools and all such factors
+And thses containers are shared with tht eteam or Cloud platform
+Now it doesn't matter what os or any other config we have we can run that container on our system
+These containers are light weight, we can build and destroy these containers anytime
+
+Now intalling docker 
+
+we have two things here
+ 
+Docker Daemon: It is a tool, which is the actula docker, which spin up, build and scale down the containers
+Docker Desktop: It is a GUI, which shows what is the actual state of our machine
+
+in terminal:
+
+docker -v ->version
+docker run -it ubuntu -> run ubuntu container in interactive mode
+
+( if docker daemon not running run command : "C:\Program Files\Docker\Docker\DockerCli.exe" -SwitchDaemon)
+
+we can see that in my machine I am having a ubuntu container, and in the containers section we can see ubuntu container running
+
+now in the terminal we are in the ubuntu container and any command we run there is inside the container
+
+so when we run command what happen is, if the image is available, so it reuse it and make a new container 
+or else it download it from hub.docker.com (it is like github for containers)
+
+we can do ctrl+d to exit
+
+
+What are container and images:
+Now like I am having dell g15 laptop and the os inside it is windows
+so we can say that this os is working on this machine
+similarly our images are like an os  and to run those images we need a container
+
+container can't do anything on their own, they are just like a machine
+
+and let say we are having 3 containers, so we can run the same image on all the three containers
+and these containers are isolated
+
+so when we work in development we make a custom image -> (like an image having ubuntu, node, mongoDB)
+now we can give any name to this image and we can ask the developers to run this image in a container
+and the config which is in this image is my own, this image can be published on the dockerhub
+and thefellow developers can run this in their local containers and similary it can used in cloud also
+
+docker container ls -> lists the running containers
+so if we are working with cloud, we just have the terminal and not the docker desktop GUI
+docker container ls -a -> it show all the containers
+
+docker start <container-name> -> starts a stopped container
+docker stop <name> -> stops the container
+
+docker run --rm my_python_app:latest (rm flag to delete the contained after execution)
+
+docker exec <name> ls -> this runs the container, performs the command and the gives result and stops the container
+
+docker exec -it <name> bash -> this way the container do not stop after executing command
+
+docker images / docker image ls  -> shows the available images
+
+so this means that all the comapnies have thier docke images on the dockerhub and we can self host those images in your local container
+
+
+docker run: The docker run command is used to create and start a new Docker container from an image.
+docker start: The docker start command is used to start one or more existing stopped containers.
+docker exec: The docker exec command is used to run a command inside a running container.
+
+so how does these containers work internally?
+
+here comes the concept of port mapping
+
+now lets say we run a nodejs application in a container
+now it is a server, and to run a server we require a port, now the port lets say which is 8000, is inside the container
+and the containers are isolated, and in my local machine i wont be able to access it, to do so we need to expose the port
+
+now lets say we run a mailhog server (an image using which we can send mails)
+docker run -it mailhog/mailhog
+this runs on port 1025
+now to expose its port we can do the following
+
+docker run -it -p 1020:1025 mailhog/mailhog
+
+it runs the 1025 port of this container inside the port 1020 of my local machine 
+
+Now how to pass the env variables inside my docker container?
+docker run -it -p 8000:8000 -e key=value -e key2=value2 node
+this way we are passing the env variables in our docker container
+
+
+How to dockerize an Application?
+
+now that we have created a basic nodejs application which is having some Files
+now we want to make a image of these files, so that it can be run on other containers easily
+
+for that we create a Dockerfile, in which we write all the configuration of how to make the image
+
+for this we first select the base image
+
+FROM ubuntu -> to use ubuntu as the base image
+so this makes a base layer of ubuntu in the container
+
+now on this ubuntu we have to install nodejs
+
+(search web on how to install node on ubuntu)
+for that we need to do apt-get update
+
+RUN apt-get update
+
+then installing curl
+
+RUN apt-get install -y curl
+
+(-y means yes to all questions asked in installation)
+
+
+after running all the setup do:
+
+COPY package.json package.json
+
+where it says COPY source destination
+
+source is package.json which get capoied inside the container
+
+then we specify the entrypoint
+
+ENTRYPOINT [ "node", "index.js" ]
+
+i.e whenever this images is run in a container we run node index.js
+
+the run 
+docker build -t dockerized-node-app .
+'.' means current directory
+this will bulid the image
+
+now what is caching the image?
+in case we do not change anything and again run build
+in this case it notices that there is nothing changed so it all gets done very fast
+not that the first lne after which we get the change, all the lower lines will be ececuted again
+so it is a good practise to install all the thing before and then copy (basically keep things structures wisely)
+
+this is also called layer caching (i.e it executes the code below the changed line)
+
+to publish this image to the hub, go to hub.docker.com
+and create a account, and then create repository
+give the name to your image and create an image
+this creates a empty image
+now with the name given by the hub 'username/imagename', create an image with this name locally
+
+now enter command
+docker push <image_name>
+
+(ensure you do docker login first to start it)
+
+now if the image is public then anyone can use it, we just need to enter the environment variables and do the port mapping
+
+
+What is Docker Compose?
+Lets say we are open souce contributer and we want to contribute to a website
+so we need to run multiple containers 
+1st container of postgres with port 5432
+2nd container of redis  on port 6372
+the mailhog and all others
+
+so the first way is to execute these commands one by one and then run them
+or else a best way is to use docker Compose
+
+using it we can setup/create/destroy multiple containers
+
+so to do this we use create a file docker-compose.yml
+
+so to use multiple containers, we can give the whole configuration in it
+
+version: '3.8' this is the version og the docker compose
+
+services:
+   my_postgres_sevice:
+      image: postgres # for this service we need image from hub.docker.com
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: review
+      POSTGRES_PASSWORD: password
+
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+
+then we need to write following in terminal:
+
+docker compose up
+
+this will make all the configurations up and running
+
+now in the docker desktop we can see in the container their is a stack running anmed 'docker' which is the name of the parent folder
+and in this there is redis and postgres running
+
+docker compose down -> destroys everything
+docker composeup -d -> this means in detached mode (in the background)
+
+
+to use this service in some another image we can use the following compose file
+
+version: '3.8'
+
+services:
+  my_postgres_service:
+    image: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: review
+      POSTGRES_PASSWORD: password
+
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+
+  node_app:
+    build:
+      context: ./path/to/your/node/app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - my_postgres_service
+      - redis
+
+
+

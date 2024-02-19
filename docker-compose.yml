@@ -1,0 +1,16 @@
+version: '3.8' 
+
+services:
+    my_postgres_sevice:
+      image: postgres # for this service we need image from hub.docker.com
+      ports:
+        - "5432:5432"
+      environment:
+        POSTGRES_USER: postgres
+        POSTGRES_DB: review
+        POSTGRES_PASSWORD: password
+
+    redis:
+      image: redis
+      ports:
+        - "6379:6379"
