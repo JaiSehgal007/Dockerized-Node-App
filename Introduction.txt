@@ -243,5 +243,280 @@ services:
       - my_postgres_service
       - redis
 
+What is Docker Networking?
+
+spin one container first
+docker run -it --name <container_name> <image_name>
+
+now in this container if we write ping google.com
+then we can see that it can ping google, i.e it can communicate with the outer world internet
+this is what docker networking is
+
+Search for docker networking, there we can see various drives using which our container can talk to the internet
+
+1st driver -> bridge mode network -> default driver (when we specify nothing), 
+i.e if we do not specify network while creating container it by default connet to the bridge network
+
+command: docker network inspect bridge
+
+this give the list of containers that are connected to this network and running
+
+so bridge is -> the network establishment between the host machine and the docker container
+this is how ot get internet connectivity
+
+docker network ls -> gives the list of the drivers
+we can custom create a network also -> User-defined bridge networks enable containers on the same Docker host to communicate with each other
+
+
+Second driver is host :
+
+command docker run -it --network=host busybox
+
+now this container is in the host mode, this means it has not got the bridge, it is directly
+connected with the host machine's network
+
+so what is the major difference in between them in reality?
+we studied port mapping earlier, we exposed the ports as they were inside docker
+but if the networking is host mode, then we need not give the port mapping as they are on same network
+
+the last one is none -> such container doesn't have any access to the internet
+
+Now how to make custom network using docker?
+
+command -> docker network create -d bridge <network_name>
+
+we first gave our network a driver, 'bridge', means we want to make the network in bridge mode
+
+docker network create -d bridge youtube
+
+now when we run a container with command
+
+docker run -it --network=youtube --name tony_stark ubuntu
+
+now creating one more container 
+
+docker run -it --network=youtube --name doc_strange busybox
+
+now  we have 2 different containers, on the same network, and both have different os
+
+now as they both are on the same network, they both can communicate
+
+to check:
+ping tony_stark
+
+it we stop one container the connection automatically breaks
+
+docker inspect youtube -> will give all the containers connected to this network with thier ip address
+so we can ping using ip or using name
+
+so when we work in docker compose, we make our cutom network, in which we can run the database and the realted apllicaitons on the same network
+
+then we need not manage the ip addresses, as these ip address keeps on changing
+
+
+What is Volume Mounting?
+when ever we make a container, it have some memory, and when it destroys, then the moeory also gets destryoed
+
+to prevent this we are having the option of 'docker volumes', we can mount volumes inside of docker
+which act as a permanent storage
+
+lets say we are having a container of ubuntu and a host windows
+but we can mount a particular directory/volume over ubuntu
+
+we will mount C:\docker_folders to the unbuntu container
+so this container will have the access to only this directory of my host
+
+command: docker run -it -v C:\docker_folders:/home/abc
+
+this mount theis volume of host to home/abc folder of the container
+so even this conainer gets destroyed then also the data is preserved
+
+we can even create our own volumes (custom volumes)
+
+command: docker volume create <volume_name>
+
+now to mount this we just have to give command while creating container
+--mount source=<volume_name>
+
+this also help prevent losing of volumes
+
+
+What is efficient Caching in layers?
+
+now we have layes in the docker file:
+
+Layer1:
+FROM ubuntu
+
+Layer2:
+RUN apt-get update
+RUN apt-get install -y curl
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash -
+RUN apt-get upgrade -y
+RUN apt-get install -y nodejs
+
+Layer3:
+COPY package.json package.json
+COPY package-lock.json package-lock.json
+COPY .gitignore .gitignore
+COPY index.js index.js
+
+Layer4:
+RUN npm install
+
+Layer5:
+ENTRYPOINT [ "node", "index.js" ]
+
+
+by default these layers are cached
+so if we cahnge the code for one layer then it changes the code for all the subsequent layers
+
+one efficiency we can make is:
+
+Layer3:
+COPY package.json package.json
+COPY package-lock.json package-lock.json
+
+Layer4:
+RUN npm install
+
+Layer5:
+COPY .gitignore .gitignore
+COPY index.js index.js
+
+so that npm install is only done when there is change is dependecies
+
+another change we can make is that,when we have lots of files, we need not copy all of them
+we just need to change
+
+Layer5:
+COPY .gitignore .gitignore
+COPY index.js index.js
+
+to
+
+Layer5:
+COPY . .
+
+that is pick everythin from this package and paste it in '.' of the container
+
+now to remove the node_modules and othe such king of files we have to create a .dockerignore file
+
+
+
+now we have the docker file as
+
+FROM ubuntu
+
+RUN apt-get update
+RUN apt-get install -y curl
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash -
+RUN apt-get upgrade -y
+RUN apt-get install -y nodejs
+
+COPY package.json /app/package.json
+COPY package-lock.json /app/package-lock.json
+
+RUN cd app && npm install
+
+COPY .gitignore /app/.gitignore
+COPY index.js /app/index.js
+
+ENTRYPOINT [ "node", "app/index.js" ]
+
+now here also we need to put /app again and again, to remove this we need to write
+
+WORKDIR /app
+
+this will inform docker to run all the code below this line to run inside the /app folder
+so the updated docker file looks like
+
+FROM ubuntu
+
+RUN apt-get update
+RUN apt-get install -y curl
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash -
+RUN apt-get upgrade -y
+RUN apt-get install -y nodejs
+
+WORKDIR /app
+
+COPY package.json package.json
+COPY package-lock.json package-lock.json
+
+RUN npm install
+
+COPY .gitignore .gitignore
+COPY index.js index.js
+
+ENTRYPOINT [ "node", "index.js" ]
+
+
+
+What is docker Multi Stage Builds?
+till now whatt we have done is single stage build, as we just picked up a base image and build
+the way of working of multistage build is:
+
+Now lets say i am having a typescript code, I have to compile that in simple js to run
+now if I am asked to write its pipeline 
+
+the our pipeline would be like
+
+FROM ubuntu
+
+RUN apt-get update
+RUN apt-get install -y curl
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash -
+RUN apt-get upgrade -y
+RUN apt-get install -y nodejs
+RUN apt-get install typescript
+
+COPY package.json /app/package.json
+COPY package-lock.json /app/package-lock.json
+
+RUN npm install
+RUN tsc -p . # for building
+
+COPY .gitignore /app/.gitignore
+COPY index.js /app/index.js
+
+ENTRYPOINT [ "node", "app/index.js" ]
+
+this increases the size of my container, we can see that we do not need the typescript in production
+as when my code is compiled then we do not need typescript, we just need it while it is building
+
+to resolve this kind of thing we use multistage Builds
+
+
+FROM ubuntu as build 
+# this makes it as a build step, which do not have any entry point
+# and we just do the work of building over here
+
+RUN apt-get update
+RUN apt-get install -y curl
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash -
+RUN apt-get upgrade -y
+RUN apt-get install -y nodejs
+RUN apt-get install typescript
+
+COPY package.json /app/package.json
+COPY package-lock.json /app/package-lock.json
+
+RUN npm install
+RUN tsc -p . # for building
+
+
+FROM node as runner 
+# now this second stage, copies all the code from the last step in the app/
+# and then run that
+
+WORKDIR app/
+
+copy --from=build app/ . #from specifies the previous stage build
+ENTRYPOINT [ "node", "index.js" ]
+
+
+now all the packages of the typescript didint came to the last stage and the final image formed will be of the last stage
+this is known as multi stage builds
 
 
